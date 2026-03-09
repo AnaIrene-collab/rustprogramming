@@ -1,56 +1,116 @@
-use std::fs::File;
-use std::io::{Write, BufReader, BufRead};
 
-struct Book {
-    title: String,
-    author: String,
-    year: u16,
+use std::io;
+use std::process::Command;
+
+enum FileOperation {
+    List(String),
+    Display(String),
+    Create(String, String),
+    Remove(String),
+    Pwd,
 }
 
-fn save_books(books: &Vec<Book>, filename: &str) {
-    let mut file = File::create(filename).expect("Unable to create file");
+fn perform_operation(operation: FileOperation) {
+    match operation {
+        FileOperation::List(dir) => {
+            Command::new("ls")
+                .arg(dir)
+                .status()
+                .expect("Failed to execute ls");
+        }
 
-    for book in books {
-        writeln!(file, "{},{},{}", book.title, book.author, book.year)
-            .expect("Unable to write to file");
-    }
-}
+        FileOperation::Display(file) => {
+            Command::new("cat")
+                .arg(file)
+                .status()
+                .expect("Failed to execute cat");
+        }
 
-fn load_books(filename: &str) -> Vec<Book> {
-    let file = File::open(filename).expect("Unable to open file");
-    let reader = BufReader::new(file);
+        FileOperation::Create(path, content) => {
+            let command = format!("echo '{}' > {}", content, path);
 
-    let mut books = Vec::new();
+            Command::new("sh")
+                .arg("-c")
+                .arg(command)
+                .status()
+                .expect("Failed to create file");
+        }
 
-    for line in reader.lines() {
-        let line = line.expect("Error reading line");
-        let parts: Vec<&str> = line.split(',').collect();
+        FileOperation::Remove(file) => {
+            Command::new("rm")
+                .arg(file)
+                .status()
+                .expect("Failed to remove file");
+        }
 
-        if parts.len() == 3 {
-            let title = parts[0].to_string();
-            let author = parts[1].to_string();
-            let year: u16 = parts[2].parse().expect("Invalid year");
-
-            books.push(Book { title, author, year });
+        FileOperation::Pwd => {
+            Command::new("pwd")
+                .status()
+                .expect("Failed to execute pwd");
         }
     }
-
-    books
 }
 
 fn main() {
-    let books = vec![
-        Book { title: "1984".to_string(), author: "George Orwell".to_string(), year: 1949 },
-        Book { title: "To Kill a Mockingbird".to_string(), author: "Harper Lee".to_string(), year: 1960 },
-    ];
+    loop {
+        println!("\nFile Operations Menu:");
+        println!("1. List files in a directory");
+        println!("2. Display file contents");
+        println!("3. Create a new file");
+        println!("4. Remove a file");
+        println!("5. Print working directory");
+        println!("0. Exit");
 
-    save_books(&books, "books.txt");
-    println!("Books saved to file.");
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice).unwrap();
 
-    let loaded_books = load_books("books.txt");
-    println!("Loaded books:");
+        match choice.trim() {
+            "1" => {
+                println!("Enter directory path:");
+                let mut path = String::new();
+                io::stdin().read_line(&mut path).unwrap();
+                perform_operation(FileOperation::List(path.trim().to_string()));
+            }
 
-    for book in loaded_books {
-        println!("{} by {}, published in {}", book.title, book.author, book.year);
+            "2" => {
+                println!("Enter file path:");
+                let mut path = String::new();
+                io::stdin().read_line(&mut path).unwrap();
+                perform_operation(FileOperation::Display(path.trim().to_string()));
+            }
+
+            "3" => {
+                println!("Enter file path:");
+                let mut path = String::new();
+                io::stdin().read_line(&mut path).unwrap();
+
+                println!("Enter content:");
+                let mut content = String::new();
+                io::stdin().read_line(&mut content).unwrap();
+
+                perform_operation(FileOperation::Create(
+                    path.trim().to_string(),
+                    content.trim().to_string(),
+                ));
+            }
+
+            "4" => {
+                println!("Enter file path:");
+                let mut path = String::new();
+                io::stdin().read_line(&mut path).unwrap();
+                perform_operation(FileOperation::Remove(path.trim().to_string()));
+            }
+
+            "5" => {
+                perform_operation(FileOperation::Pwd);
+            }
+
+            "0" => {
+                println!("Goodbye!");
+                break;
+            }
+
+            _ => println!("Invalid option"),
+        }
     }
 }
